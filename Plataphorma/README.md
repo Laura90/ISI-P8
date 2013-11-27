@@ -1,0 +1,227 @@
+Plataphorma
+===========
+
+Meteor pet project created to teach my students the following Meteor functionality: 
+
+* Collection's publish/subscribe 
+* Deps.autorun 
+* Meteor.methods/call 
+* Integration of non-Meteor code in compatibility folder (HTML5 games Alien Invasion and Froot Wars)
+* Usage of allow to control client access to collections
+
+![ScreenShot](/screenshot.png)
+
+
+Plataphorma offers the possibility to run 2 different HTML5 games: Alien Invasion and Froot Wars. 
+
+On the right side of the screen the best players of each game are shown, updated in real time each time a signed in player finishes a game. If no game is selected, the best players overall are shown.
+
+On the left side of the screen a chatroom for the current game is available. Only signed in users can post messages. If no game is selected a general chatroom is shown.
+
+The original code of the two HTML5 games integrated in this project is available here:
+* Alien Invasion: https://github.com/cykod/AlienInvasion
+* Froot Wars: http://www.wrox.com/WileyCDA/WroxTitle/Professional-HTML5-Mobile-Game-Development.productCd-1118301323,descCd-DOWNLOAD.html
+
+Bootstrap style (file bootstrap.min.css) provided by http://bootswatch.com
+
+
+Running the project
+-------------------
+
+A live version of this code is running here: http://plataphorma.meteor.com
+
+To run the project locally, clone the repo and run ```meteor``` inside it. You can see in .meteor/packages that this Meteor project uses these packages:
+* ```meteor remove autopublish```
+* ```meteor remove insecure```
+* ```meteor add bootstrap```
+* ```meteor add accounts-ui```
+* ```meteor add accounts-password```
+
+
+----------RESPUESTAS A LAS PREGUNTAS DE LA CLASE ---------------
+
+1)Click en boton de juego
+
+En el archivo client.js, cuando se hace click en un boton de juego se ejecutan las lineas de codigo siguientes:
+
+Template.choose_game.events = {
+    'click #AlienInvasion': function () {
+	$('#gamecontainer').hide();
+	$('#container').show();
+	var game = Games.findOne({name:"AlienInvasion"});
+	Session.set("current_game", game._id);
+    },
+    'click #FrootWars': function () {
+	$('#container').hide();
+	$('#gamecontainer').show();
+	var game = Games.findOne({name:"FrootWars"});
+	Session.set("current_game", game._id);
+    },
+    'click #none': function () {
+	$('#container').hide();
+	$('#gamecontainer').hide();
+	Session.set("current_game", "none");
+	}
+	
+	Cuando se activa el evento click, se muestra el juego actual y el resto se esconden.Se mantiene la sesion actual abierta con un identificador.
+	
+2)Se escribe mensaje chat sin estar autenticado
+
+ Se ejecuta el siguiente código del client.js
+
+Template.input.events = {
+    'keydown input#message' : function (event) {
+	if (event.which == 13) { 
+	    .
+	    .
+	    .
+	    }
+	 else {
+		$("#login-error").show();
+	    }
+	}
+    }
+
+ Cuando esto sucede, entra en el else y se muestra un login-error que dice You must be signed in to post messages.
+
+3)Se escribe mensaje chat estando autenticado
+     
+     Se ejecuta el siguiente codigo del client.js
+     
+     Template.input.events = {
+    'keydown input#message' : function (event) {
+	if (event.which == 13) { 
+	    if (Meteor.userId()){
+		var user_id = Meteor.user()._id;	    
+		var message = $('#message');
+		if (message.value != '') {
+		    Messages.insert({
+			user_id: user_id,
+			message: message.val(),
+			time: Date.now(),
+			game_id: Session.get("current_game")
+		    });
+		    message.val('')
+		}
+	    }
+	    else {
+		$("#login-error").show();
+	    }
+	}
+    }
+    
+ Con id del ususario y el mensaje si el usuario esta logueado, y si el mensaje tiene un contenido, no esta vacio, se introduce en la base de datos con los campos mensaje del usuario,id  del usuario ,fecha actual del mensaje y chat del juego en que se ha estado escribiendo.
+  Luego se vacia el input donde se ha escrito.
+  
+  
+4)Se termina partida con puntuacion mayor sin estar autenticado
+
+Se ejecutan las siguientes lineas de codigo del game.js del Alien Invasion.(En el caso de jugar al otro juego, las correspondientes del game.js)
+
+var winGame = function() {
+    Meteor.call("matchFinish", Session.get("current_game"), Game.points);
+    Game.setBoard(3,new TitleScreen("You win!", 
+                                    "Press fire to play again",
+                                    playGame));
+};
+
+// Llamada cuando la nave del jugador ha sido alcanzada, para
+// finalizar el juego
+var loseGame = function() {
+    Meteor.call("matchFinish", Session.get("current_game"), Game.points);
+    Game.setBoard(3,new TitleScreen("You lose!", 
+                                    "Press fire to play again",
+                                    playGame));
+};
+
+Cuando se acaba una partida se llama al metodo machFinish, en el archivo server.js
+
+
+Meteor.methods({
+    matchFinish: function (game, points) {
+	// Don't insert in the Matches collection a match if the user
+	// has not signed in
+	if (this.userId)
+	    Matches.insert ({user_id: this.userId, 
+			     time_end: Date.now(),
+			     points: points,
+			     game_id: game
+			    });
+    }
+});
+
+
+Como el usuario no esta autenticado, no se llama al metodo matchFinish y por ello no se guarda la puntuacion en la base de datos.
+
+5) Se termina partida con puntacion estando autenticado
+
+Se ejecutan las siguientes lineas del game.js
+
+var winGame = function() {
+   Meteor.call("matchFinish", Session.get("current_game"), Game.points);
+   Game.setBoard(3,new TitleScreen("You win!",
+                                   "Press fire to play again",
+                                   playGame));
+};
+
+
+// Llamada cuando la nave del jugador ha sido alcanzada, para
+// finalizar el juego
+var loseGame = function() {
+   Meteor.call("matchFinish", Session.get("current_game"), Game.points);
+   Game.setBoard(3,new TitleScreen("You lose!",
+                                   "Press fire to play again",
+                                   playGame));
+};
+
+
+Cuando se acaba una partida se llama al metodo machFinish.
+
+--> Server.js
+Meteor.methods({
+   matchFinish: function (game, points) {
+       // Don't insert in the Matches collection a match if the user
+       // has not signed in
+       if (this.userId)
+           Matches.insert ({user_id: this.userId,
+                            time_end: Date.now(),
+                            points: points,
+                            game_id: game
+                           });
+   }
+});
+
+
+Como el usuario no esta autenticado, se llama al metodo matchFinish y se guarda en la base de datos la puntuacion en la base de datos Matches , junto con el id del usuario, la fecha de la puntuacion y los puntos conseguidos en el juego.
+
+ 6) ¿Que sale en consola cuando te autenticas (sign in)?
+
+
+
+Se ejecutan las siguientes lineas del client.js
+
+var currentUser = null;
+Deps.autorun(function(){
+   console.log("current user: " + currentUser);
+   currentUser = Meteor.userId();
+   console.log("current user: " + currentUser);
+});
+
+La primera vez que te conectas, current user se pon a null, entonces imprimes currentUser.Luego saca el id de usuario autenticado y te lo muestra.
+
+
+
+7) ¿Que sale en consola cuando sale (Sign out)?
+
+Se ejecutan las siguientes lineas del client.js
+
+Deps.autorun(function(){
+   console.log("current user: " + currentUser);
+   currentUser = Meteor.userId();
+   console.log("current user: " + currentUser);
+});
+
+Al principio aparece el id del usuario que ha salido, y despues comprueba el id del usuario que ahora es null, porque ya no esta autenticado.
+ 
+
+
